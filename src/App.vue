@@ -1,32 +1,39 @@
 <template>
   <div id="app">
     <div class="editor">
+      <!-- <pre>{{currentUser}}</pre> -->
       <div class="editor__side-menu">
         <div class="side-menu">
           <fieldset class="side-menu__fieldset">
             <legend class="side-menu__legend">Bret</legend>
             <div class="side-menu__button">
-              <button class="btn btn_size_l btn_theme_calm ">Загрузить случайного пользователя</button>
+              <button class="btn btn_size_l btn_theme_calm"
+                @click="loadUser()"
+              >Загрузить случайного пользователя</button>
             </div>
             <label for="name" class="side-menu__label">Имя пользователя</label>
             <input id="name" 
               class="side-menu__input" 
               type="text"
+              :value="currentUser.name ? currentUser.name : ''"
             >
             <label for="email" class="side-menu__label">Адрес e-mail</label>
             <input id="email" 
               class="side-menu__input" 
               type="text"
+              :value="currentUser.email ? currentUser.email : ''"
             >
             <label for="phone" class="side-menu__label">Контактный телефон</label>
             <input id="phone" 
               class="side-menu__input" 
               type="text"
+              :value="currentUser.phone ? currentUser.phone : ''"
             >
             <label for="site" class="side-menu__label">Основной веб-сайт</label>
             <input id="site" 
               class="side-menu__input" 
               type="text"
+              :value="currentUser.site ? currentUser.site : ''"
             >
           </fieldset>
         </div>
@@ -67,9 +74,29 @@
 </template>
 
 <script>
+import all_users from '../src/users.json'
+import {randomInteger} from './pure'
 
 export default {
   name: 'App',
+  data() {
+    return {
+      users: all_users,
+      currentUser: {
+        name: '',
+        email: '',
+        phone: '',
+        site: '',
+      },
+    }
+  },
+  methods: {
+    loadUser() {
+      const usersAmount = this.users.length + 1;
+      const userRandomNubder = randomInteger(usersAmount);
+      this.currentUser = this.users[userRandomNubder];
+    }
+  }
 }
 </script>
 
@@ -118,7 +145,6 @@ export default {
     border: 2px dashed green;
     margin: 0 3px;
     font-size: 12px;
-    cursor: pointer;
   }
 }
 

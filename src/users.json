@@ -1,0 +1,38 @@
+[
+    {
+        "name": "User1",
+        "email": "user1@users.com",
+        "phone": "+74951111111",
+        "site": "user1.ru"
+    },
+    {
+        "name": "User3",
+        "email": "user3@users.com",
+        "phone": "+74953333333",
+        "site": "user3.ru"
+    },
+    {
+        "name": "User4",
+        "email": "user4@users.com",
+        "phone": "+74954444444",
+        "site": "user4.ru"
+    },
+    {
+        "name": "User5",
+        "email": "user5@users.com",
+        "phone": "+74955555555",
+        "site": "user5.ru"
+    },
+    {
+        "name": "User6",
+        "email": "user6@users.com",
+        "phone": "+74956666666",
+        "site": "user6.ru"
+    },
+    {
+        "name": "User2",
+        "email": "user2@users.com",
+        "phone": "+74952222222",
+        "site": "user2.ru"
+    }
+]
