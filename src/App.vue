@@ -1,7 +1,6 @@
 <template>
   <div id="app">
     <div class="editor">
-      <!-- <pre>{{currentUser}}</pre> -->
       <div class="editor__side-menu">
         <div class="side-menu">
           <fieldset class="side-menu__fieldset">
@@ -15,25 +14,25 @@
             <input id="name" 
               class="side-menu__input" 
               type="text"
-              :value="currentUser.name ? currentUser.name : ''"
+              v-model="currentUser.name"
             >
             <label for="email" class="side-menu__label">Адрес e-mail</label>
             <input id="email" 
               class="side-menu__input" 
               type="text"
-              :value="currentUser.email ? currentUser.email : ''"
+              v-model="currentUser.email"
             >
             <label for="phone" class="side-menu__label">Контактный телефон</label>
             <input id="phone" 
               class="side-menu__input" 
               type="text"
-              :value="currentUser.phone ? currentUser.phone : ''"
+              v-model="currentUser.phone"
             >
             <label for="site" class="side-menu__label">Основной веб-сайт</label>
             <input id="site" 
               class="side-menu__input" 
               type="text"
-              :value="currentUser.site ? currentUser.site : ''"
+              v-model="currentUser.site"
             >
           </fieldset>
         </div>
@@ -42,21 +41,31 @@
         <div class="tokens">
           <span class="tokens__text">Вставить токен: </span>
           <ul class="tokens__list">
-            <li class="tokens__item">имя</li>
-            <li class="tokens__item">email</li>
-            <li class="tokens__item">телефон</li>
-            <li class="tokens__item">сайт</li>
+            <li class="tokens__item"
+              :class="{
+                'tokens__item_disabled': !currentUser[token.id],
+              }"
+              v-for="token in tokens"
+              :key="token.id"
+              @click="clickToken(token.id)"
+              
+            >{{token.name}}</li>
           </ul>
         </div>
         <div class="editor__letter-area">
-          <div class="editor__letter" contenteditable="true">
-            Hello darkness, my old <span class="editor__added-token">friend</span>,
-            I've come to talk with you again,
-            Because a <span class="editor__added-token">vision</span> softly creeping,
-            Left its seeds while I was sleeping,
-            And the vision that was planted in my brain
-            Still remains
-            Within the sound of silence
+          <div class="editor__letter" 
+            ref="letter"
+            contenteditable="true"
+            @keydown.delete="deleteToken()"
+            @click="clickLetterArea"
+            >
+              Hello darkness, my old <span class="editor__added-token" contenteditable="false">friend</span>, I've come to talk with you again,
+              Because a 
+              <span class="editor__added-token"  contenteditable="false">vision</span> softly creeping,
+              Left its seeds while I was sleeping,
+              And the vision that was planted in my brain
+              Still remains
+              Within the sound of silence
           </div>
         </div>        
         <div class="editor__btns">
@@ -88,15 +97,96 @@ export default {
         phone: '',
         site: '',
       },
+      tokens: [
+        { id: 'name',
+          name: 'имя' },
+        { id: 'email',
+          name: 'почта' },
+        { id: 'phone',
+          name: 'телефон' },
+        { id: 'site',
+          name: 'сайт' },
+      ],
+      selectionLetter: {
+        start: 0,
+        end: 0,
+        html: '',
+        allNodes: NodeList,
+        anchorNode: ''
+      },
+    }
+  },
+  computed: {
+    letter() {
+      return this.$refs['letter'];
     }
   },
   methods: {
     loadUser() {
       const usersAmount = this.users.length + 1;
-      const userRandomNubder = randomInteger(usersAmount);
-      this.currentUser = this.users[userRandomNubder];
-    }
-  }
+      const userRandomNuьber = randomInteger(usersAmount);
+      this.currentUser = this.users[userRandomNuьber];
+    },
+
+    clickToken(tokenId) {
+      if (!this.currentUser[tokenId]) return;
+      const cursoredNode = this.selectionLetter.anchorNode;
+      let ndxNodeWhereInsert = '';
+
+      const newLetterHTML = this.selectionLetter.allNodes.map((noda,ndx) => {
+        if (cursoredNode !== noda)
+          return noda.nodeType === 3 ? noda.textContent : noda.outerHTML;
+        else {
+          let str = noda.textContent;
+          ndxNodeWhereInsert = (noda.nodeType === 3 && this.selectionLetter.start === 0) ? ndx-1 : ndx;
+          const newStringNode = str.substring(0, this.selectionLetter.start) + 
+                `<span class="editor__added-token" contenteditable="false">${tokenId}</span>` + 
+                str.substring(this.selectionLetter.end);
+          return newStringNode;
+        }
+      });
+      this.letter.innerHTML = newLetterHTML.join('');
+
+      this.selection.removeAllRanges();
+
+      //ставим курсор после добавленной ноды
+      let range = new Range();
+      
+      const nodeCursorBefore = this.letter.childNodes[ndxNodeWhereInsert + 2];
+      const nodeCursorAfter = this.letter.childNodes[ndxNodeWhereInsert + 1];
+      // console.log('nodes - ',this.letter.childNodes);
+      // console.log('node - ',this.letter.childNodes[ndxNodeWhereInsert + 2]);
+      // console.log('nodeType - ',this.letter.childNodes[ndxNodeWhereInsert + 2].nodeType);
+      range.setStartBefore(nodeCursorBefore);
+      range.setEndAfter(nodeCursorAfter);
+      this.selection.addRange(range);
+
+      this.updateSelectionLetter();
+    }, 
+    clickLetterArea() {
+      this.updateSelectionLetter();
+    },
+    deleteToken() {
+      
+      // const selection = this.selection;
+      // console.log('selection = ', selection);
+			// const range = selection.getRangeAt(0);
+      // console.log('range = ', range);
+
+    },
+    updateSelectionLetter() {
+      this.selectionLetter.start = this.selection.anchorOffset;
+      this.selectionLetter.end = this.selection.focusOffset;
+      this.selectionLetter.anchorNode = this.selection.anchorNode;
+      this.selectionLetter.allNodes = Array.from(this.selection.anchorNode.parentNode.childNodes);
+      this.selectionLetter.html = this.$refs.letter.innerHTML;
+      this.selectionLetter.outerhtml = this.$refs.letter.outerHTML;
+      // this.selection.removeAllRanges();
+
+    },
+  },
+  watch: {
+  },
 }
 </script>
 
@@ -138,6 +228,7 @@ export default {
     text-align: left;
   }
   &__added-token {
+    display: inline-block;
     padding: 2px 4px;
     background-color: transparent;
     font-weight: bolder;
@@ -145,6 +236,7 @@ export default {
     border: 2px dashed green;
     margin: 0 3px;
     font-size: 12px;
+    outline: none;
   }
 }
 
@@ -174,9 +266,16 @@ export default {
   &__item {
     display: inline-block;
     padding: 5px;
-    background-color: green;
     margin-right: 10px;
+    background-color: green;
     color: aliceblue;
+    cursor: pointer;
+
+    &_disabled {
+      background-color: gray;
+      color: white;
+      cursor: unset;
+    }
   }
 }
 
@@ -187,6 +286,7 @@ button.btn {
 	border: 1px solid rgb(122, 159, 230);
 	cursor: pointer;
   margin-right: 10px;
+  margin-left: 0;
 	font-size: 0.8rem;
 	letter-spacing: 0.05rem;
 	padding: 0.6rem 1rem;
