@@ -1,5 +1,5 @@
 export function randomInteger(max) {
-    let rand = Math.random() * (max + 1);
+    let rand = Math.random() * max;
     return Math.floor(rand);
 }
   

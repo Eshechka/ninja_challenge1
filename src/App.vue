@@ -48,7 +48,6 @@
               v-for="token in tokens"
               :key="token.id"
               @click="clickToken(token.id)"
-              
             >{{token.name}}</li>
           </ul>
         </div>
@@ -56,12 +55,12 @@
           <div class="editor__letter" 
             ref="letter"
             contenteditable="true"
-            @keydown.delete="deleteToken()"
             @click="clickLetterArea"
+            @keyup="letterChanged($event)"
             >
-              Hello darkness, my old <span class="editor__added-token" contenteditable="false">friend</span>, I've come to talk with you again,
+              Hello darkness, my old <span data-token="true" class="editor__added-token" contenteditable="false">friend</span>, I've come to talk with you again,
               Because a 
-              <span class="editor__added-token"  contenteditable="false">vision</span> softly creeping,
+              <span data-token="true" class="editor__added-token"  contenteditable="false">vision</span> softly creeping,
               Left its seeds while I was sleeping,
               And the vision that was planted in my brain
               Still remains
@@ -73,7 +72,7 @@
           <button class="btn">Сохранить в localStorage</button>
         </div>
         <div class="editor__template">
-          <div class="editor__ready-letter" contenteditable="true" readonly></div>
+          <div class="editor__ready-letter" contenteditable="true" readonly>{{readyLetter}}</div>
         </div>
 
       </div>
@@ -114,65 +113,56 @@ export default {
         allNodes: NodeList,
         anchorNode: ''
       },
+      readyLetter: '',
     }
   },
   computed: {
     letter() {
       return this.$refs['letter'];
-    }
+    },
   },
   methods: {
     loadUser() {
-      const usersAmount = this.users.length + 1;
-      const userRandomNuьber = randomInteger(usersAmount);
-      this.currentUser = this.users[userRandomNuьber];
+      const usersAmount = this.users.length;
+      const userRandomNumber = randomInteger(usersAmount);
+      this.currentUser = this.users[userRandomNumber];
     },
-
     clickToken(tokenId) {
       if (!this.currentUser[tokenId]) return;
-      const cursoredNode = this.selectionLetter.anchorNode;
+
+      const nodeWhereCursor = this.selectionLetter.anchorNode;
       let ndxNodeWhereInsert = '';
 
       const newLetterHTML = this.selectionLetter.allNodes.map((noda,ndx) => {
-        if (cursoredNode !== noda)
+        if (nodeWhereCursor !== noda)
           return noda.nodeType === 3 ? noda.textContent : noda.outerHTML;
         else {
           let str = noda.textContent;
           ndxNodeWhereInsert = (noda.nodeType === 3 && this.selectionLetter.start === 0) ? ndx-1 : ndx;
           const newStringNode = str.substring(0, this.selectionLetter.start) + 
-                `<span class="editor__added-token" contenteditable="false">${tokenId}</span>` + 
+                `<span data-token="true" class="editor__added-token" contenteditable="false">${this.currentUser[tokenId]}</span>` + 
                 str.substring(this.selectionLetter.end);
           return newStringNode;
         }
       });
       this.letter.innerHTML = newLetterHTML.join('');
 
-      this.selection.removeAllRanges();
-
       //ставим курсор после добавленной ноды
+      this.selection.removeAllRanges();
       let range = new Range();
-      
-      const nodeCursorBefore = this.letter.childNodes[ndxNodeWhereInsert + 2];
-      const nodeCursorAfter = this.letter.childNodes[ndxNodeWhereInsert + 1];
-      // console.log('nodes - ',this.letter.childNodes);
-      // console.log('node - ',this.letter.childNodes[ndxNodeWhereInsert + 2]);
-      // console.log('nodeType - ',this.letter.childNodes[ndxNodeWhereInsert + 2].nodeType);
-      range.setStartBefore(nodeCursorBefore);
-      range.setEndAfter(nodeCursorAfter);
+      range.selectNode(this.letter.childNodes[ndxNodeWhereInsert + 1]);
+      range.collapse(false);
       this.selection.addRange(range);
 
       this.updateSelectionLetter();
+      this.updateReadyText();
     }, 
     clickLetterArea() {
       this.updateSelectionLetter();
     },
-    deleteToken() {
-      
-      // const selection = this.selection;
-      // console.log('selection = ', selection);
-			// const range = selection.getRangeAt(0);
-      // console.log('range = ', range);
-
+    letterChanged(event) {
+      if (!event.returnValue) return;
+      this.updateReadyText();
     },
     updateSelectionLetter() {
       this.selectionLetter.start = this.selection.anchorOffset;
@@ -181,8 +171,21 @@ export default {
       this.selectionLetter.allNodes = Array.from(this.selection.anchorNode.parentNode.childNodes);
       this.selectionLetter.html = this.$refs.letter.innerHTML;
       this.selectionLetter.outerhtml = this.$refs.letter.outerHTML;
-      // this.selection.removeAllRanges();
-
+    },
+    updateReadyText() {
+      const readyLetterNodes = Array.from(this.letter.childNodes).map(node => {
+        if (node.nodeType === 3) {
+          return node.textContent;
+        }
+        else if (node.dataset.token) {
+          return `[[[${node.textContent}]]]`;
+        } 
+        else {
+          return node.textContent;
+        }
+        
+      });
+      this.readyLetter = readyLetterNodes.join('')
     },
   },
   watch: {
