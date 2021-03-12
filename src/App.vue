@@ -58,7 +58,7 @@
             @click="clickLetterArea"
             @keyup="letterChanged($event)"
             >
-              Hello darkness, my old <span data-token="true" class="editor__added-token" contenteditable="false">friend</span>, I've come to talk with you again,
+              Hello darkness , my old <span data-token="true" class="editor__added-token" contenteditable="false">friend</span>, I've come to talk with you again,
               Because a 
               <span data-token="true" class="editor__added-token"  contenteditable="false">vision</span> softly creeping,
               Left its seeds while I was sleeping,
@@ -68,16 +68,20 @@
           </div>
         </div>        
         <div class="editor__btns">
-          <button class="btn">Загрузить из localStorage</button>
-          <button class="btn">Сохранить в localStorage</button>
+          <button class="btn"
+            @click="loadFromLocalstorage"
+          >Загрузить из localStorage</button>
+          <button class="btn"
+            @click="saveToLocalstorage"
+          >Сохранить в localStorage</button>
         </div>
         <div class="editor__template">
-          <div class="editor__ready-letter" contenteditable="true" readonly>{{readyLetter}}</div>
+          <div class="editor__ready-letter" contenteditable="true" readonly>{{readyLetter.text}}</div>
         </div>
 
       </div>
     </div>
-  
+  <pre>{{readyLetter}}</pre>
   </div>
 </template>
 
@@ -113,7 +117,13 @@ export default {
         allNodes: NodeList,
         anchorNode: ''
       },
-      readyLetter: '',
+      readyLetter: {
+        text: '',
+        tokens: [
+          {"friend": "friend"},
+          {"vision": "vision"},
+        ],
+      },
     }
   },
   computed: {
@@ -131,20 +141,34 @@ export default {
       if (!this.currentUser[tokenId]) return;
 
       const nodeWhereCursor = this.selectionLetter.anchorNode;
-      let ndxNodeWhereInsert = '';
+      let ndxNodeWhereInsert = 0;
+      let ndxNodeWithToken = 0;
 
       const newLetterHTML = this.selectionLetter.allNodes.map((noda,ndx) => {
-        if (nodeWhereCursor !== noda)
-          return noda.nodeType === 3 ? noda.textContent : noda.outerHTML;
+        if (nodeWhereCursor !== noda) {
+          let nodeTextContent = '';
+          if (noda.nodeType === 3) {
+            nodeTextContent = noda.textContent;
+          } 
+          else {
+            nodeTextContent = noda.outerHTML;
+            if (noda.dataset.token) ndxNodeWithToken++;//ищем новый порядковый номер для вставляемой ноды с токеном
+          }
+          return nodeTextContent;
+        }
         else {
           let str = noda.textContent;
           ndxNodeWhereInsert = (noda.nodeType === 3 && this.selectionLetter.start === 0) ? ndx-1 : ndx;
           const newStringNode = str.substring(0, this.selectionLetter.start) + 
                 `<span data-token="true" class="editor__added-token" contenteditable="false">${this.currentUser[tokenId]}</span>` + 
                 str.substring(this.selectionLetter.end);
+
+          this.readyLetter.tokens.splice(ndxNodeWithToken, 0, {[tokenId] : this.currentUser[tokenId]});
+          
           return newStringNode;
         }
       });
+      
       this.letter.innerHTML = newLetterHTML.join('');
 
       //ставим курсор после добавленной ноды
@@ -155,14 +179,15 @@ export default {
       this.selection.addRange(range);
 
       this.updateSelectionLetter();
-      this.updateReadyText();
+      this.updateReadyLetterText();
     }, 
     clickLetterArea() {
       this.updateSelectionLetter();
     },
     letterChanged(event) {
       if (!event.returnValue) return;
-      this.updateReadyText();
+      this.updateSelectionLetter();
+      this.updateReadyLetterText();
     },
     updateSelectionLetter() {
       this.selectionLetter.start = this.selection.anchorOffset;
@@ -172,7 +197,7 @@ export default {
       this.selectionLetter.html = this.$refs.letter.innerHTML;
       this.selectionLetter.outerhtml = this.$refs.letter.outerHTML;
     },
-    updateReadyText() {
+    updateReadyLetterText() {
       const readyLetterNodes = Array.from(this.letter.childNodes).map(node => {
         if (node.nodeType === 3) {
           return node.textContent;
@@ -183,9 +208,31 @@ export default {
         else {
           return node.textContent;
         }
-        
       });
-      this.readyLetter = readyLetterNodes.join('')
+      this.readyLetter.text = readyLetterNodes.join('');
+      // this.readyLetter.tokens = []; //!!!!!!
+    },
+    updateLetterText() {
+      const readyLetterNodes = Array.from(this.letter.childNodes).map(node => {
+        if (node.nodeType === 3) {
+          return node.textContent;
+        }
+        else if (node.dataset.token) {
+          return `[[[${node.textContent}]]]`;
+        } 
+        else {
+          return node.textContent;
+        }
+      });
+      this.readyLetter.text = readyLetterNodes.join('');
+      // this.readyLetter.tokens = []; //!!!!!!
+    },
+    saveToLocalstorage() {
+      localStorage.setItem("letter", JSON.stringify(this.readyLetter));
+    },
+    loadFromLocalstorage() {
+      this.readyLetter = JSON.parse(localStorage.getItem("letter"));
+
     },
   },
   watch: {
@@ -244,6 +291,7 @@ export default {
 }
 
 .side-menu {
+
   &__label {
     text-align: left;
     width: 100%;
