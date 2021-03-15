@@ -55,16 +55,20 @@
           <div class="editor__letter" 
             ref="letter"
             contenteditable="true"
-            @click="clickLetterArea"
+            @click="clickLetterArea()"
             @keyup="letterChanged($event)"
             >
-              Hello darkness , my old <span data-token="true" class="editor__added-token" contenteditable="false">friend</span>, I've come to talk with you again,
-              Because a 
-              <span data-token="true" class="editor__added-token"  contenteditable="false">vision</span> softly creeping,
-              Left its seeds while I was sleeping,
-              And the vision that was planted in my brain
-              Still remains
-              Within the sound of silence
+            <div class="editor__letter-fragment" 
+              v-for="(dataItem, ndx) in dataForLetter"
+              :key=ndx
+            >
+              <p class="editor__text-p" v-if="dataItem.textP">{{dataItem.textP}}</p>
+              <addedToken
+                v-if="dataItem.tokenId"
+                :textToken="currentUser[dataItem.tokenId] || dataItem.textAddedToken"
+                :tokenId="`${dataItem.tokenid}`"
+              ></addedToken>
+            </div>
           </div>
         </div>        
         <div class="editor__btns">
@@ -76,12 +80,15 @@
           >Сохранить в localStorage</button>
         </div>
         <div class="editor__template">
-          <div class="editor__ready-letter" contenteditable="true" readonly>{{readyLetter.text}}</div>
+          <div class="editor__ready-letter" 
+            contenteditable="true" 
+            readonly
+          >{{transformReadyLetter}}</div>
         </div>
 
+      <pre>{{dataForLetter}}</pre>
       </div>
     </div>
-  <pre>{{readyLetter}}</pre>
   </div>
 </template>
 
@@ -89,8 +96,13 @@
 import all_users from '../src/users.json'
 import {randomInteger} from './pure'
 
+import addedToken from './components/addedToken.vue'
+
 export default {
   name: 'App',
+  components: {
+    addedToken,
+  },
   data() {
     return {
       users: all_users,
@@ -101,14 +113,10 @@ export default {
         site: '',
       },
       tokens: [
-        { id: 'name',
-          name: 'имя' },
-        { id: 'email',
-          name: 'почта' },
-        { id: 'phone',
-          name: 'телефон' },
-        { id: 'site',
-          name: 'сайт' },
+        { id: 'name', name: 'имя' },
+        { id: 'email', name: 'почта' },
+        { id: 'phone', name: 'телефон' },
+        { id: 'site', name: 'сайт' },
       ],
       selectionLetter: {
         start: 0,
@@ -117,19 +125,37 @@ export default {
         allNodes: NodeList,
         anchorNode: ''
       },
-      readyLetter: {
-        text: '',
-        tokens: [
-          {"friend": "friend"},
-          {"vision": "vision"},
-        ],
-      },
+      dataForLetter: [
+        {
+          textP: 'Hello darkness, my old',
+          textAddedToken: 'friend',
+          tokenId: 'name',
+        },
+        {
+          textP: `I've come to talk with you `,
+          textAddedToken: 'again',
+          tokenId: 'site',
+        },
+        {
+          textP: `, Because a vision`,
+          textAddedToken: '',
+          tokenId: '',
+        },
+      ],
     }
   },
   computed: {
     letter() {
       return this.$refs['letter'];
     },
+    transformReadyLetter() {
+      return this.dataForLetter.reduce((readyText, item) => {
+        const textToken = item.textAddedToken ? `[[[${item.textAddedToken}]]]` : '';
+        const textP = item.textP;
+        return readyText + textP + textToken + '';
+      }, '');
+    },
+
   },
   methods: {
     loadUser() {
@@ -140,46 +166,38 @@ export default {
     clickToken(tokenId) {
       if (!this.currentUser[tokenId]) return;
 
-      const nodeWhereCursor = this.selectionLetter.anchorNode;
+      const nodeWhereCursor = this.selectionLetter.anchorNode.parentNode;
       let ndxNodeWhereInsert = 0;
-      let ndxNodeWithToken = 0;
 
-      const newLetterHTML = this.selectionLetter.allNodes.map((noda,ndx) => {
-        if (nodeWhereCursor !== noda) {
-          let nodeTextContent = '';
-          if (noda.nodeType === 3) {
-            nodeTextContent = noda.textContent;
-          } 
-          else {
-            nodeTextContent = noda.outerHTML;
-            if (noda.dataset.token) ndxNodeWithToken++;//ищем новый порядковый номер для вставляемой ноды с токеном
+      this.selectionLetter.allNodes.forEach((noda, ndx) => {
+        const textPNoda = noda.querySelector('.editor__text-p');
+
+          if (nodeWhereCursor === textPNoda) {
+            const newTextPLeft = textPNoda.textContent.substring(0, this.selectionLetter.start) || ' ';
+            const newTextPRight = textPNoda.textContent.substring(this.selectionLetter.end);
+            ndxNodeWhereInsert = ndx;
+
+            this.dataForLetter[ndxNodeWhereInsert].textP = newTextPRight;
+            this.dataForLetter.splice(ndxNodeWhereInsert, 0,
+              {
+                textP: newTextPLeft,
+                textAddedToken: this.currentUser[tokenId],
+                tokenId: tokenId
+              });
           }
-          return nodeTextContent;
-        }
-        else {
-          let str = noda.textContent;
-          ndxNodeWhereInsert = (noda.nodeType === 3 && this.selectionLetter.start === 0) ? ndx-1 : ndx;
-          const newStringNode = str.substring(0, this.selectionLetter.start) + 
-                `<span data-token="true" class="editor__added-token" contenteditable="false">${this.currentUser[tokenId]}</span>` + 
-                str.substring(this.selectionLetter.end);
-
-          this.readyLetter.tokens.splice(ndxNodeWithToken, 0, {[tokenId] : this.currentUser[tokenId]});
-          
-          return newStringNode;
-        }
+        
       });
-      
-      this.letter.innerHTML = newLetterHTML.join('');
 
       //ставим курсор после добавленной ноды
-      this.selection.removeAllRanges();
-      let range = new Range();
-      range.selectNode(this.letter.childNodes[ndxNodeWhereInsert + 1]);
-      range.collapse(false);
-      this.selection.addRange(range);
+      this.$nextTick(() => {
+        this.selection.removeAllRanges();
+        let range = new Range();
+        range.selectNode(this.letter.childNodes[ndxNodeWhereInsert].querySelector('.added-token'));
+        range.collapse(false);
+        this.selection.addRange(range);
 
-      this.updateSelectionLetter();
-      this.updateReadyLetterText();
+        this.updateSelectionLetter();
+      });
     }, 
     clickLetterArea() {
       this.updateSelectionLetter();
@@ -187,52 +205,44 @@ export default {
     letterChanged(event) {
       if (!event.returnValue) return;
       this.updateSelectionLetter();
-      this.updateReadyLetterText();
     },
     updateSelectionLetter() {
       this.selectionLetter.start = this.selection.anchorOffset;
       this.selectionLetter.end = this.selection.focusOffset;
       this.selectionLetter.anchorNode = this.selection.anchorNode;
-      this.selectionLetter.allNodes = Array.from(this.selection.anchorNode.parentNode.childNodes);
+      this.selectionLetter.allNodes = Array.from(this.letter.childNodes);
       this.selectionLetter.html = this.$refs.letter.innerHTML;
       this.selectionLetter.outerhtml = this.$refs.letter.outerHTML;
     },
-    updateReadyLetterText() {
-      const readyLetterNodes = Array.from(this.letter.childNodes).map(node => {
-        if (node.nodeType === 3) {
-          return node.textContent;
-        }
-        else if (node.dataset.token) {
-          return `[[[${node.textContent}]]]`;
-        } 
-        else {
-          return node.textContent;
-        }
-      });
-      this.readyLetter.text = readyLetterNodes.join('');
-      // this.readyLetter.tokens = []; //!!!!!!
-    },
+    // updateReadyLetterText() {
+    //   const readyLetterNodes = Array.from(this.letter.childNodes).map(node => {
+    //     const textPNoda = node.querySelector('.editor__text-p');
+    //     const addedToken = node.querySelector('.added-token');
+    //     let renewNode = '';
+    //     if (textPNoda) {
+    //       renewNode += textPNoda.textContent;
+    //     }
+    //     if (addedToken) {
+    //       renewNode += `[[[${addedToken.textContent.trim()}]]]`;
+    //     }
+    //     return renewNode;
+    //   });
+    //   console.log('readyLetterNodes = ',readyLetterNodes);
+    //   this.readyLetter.text = readyLetterNodes.join('');
+    // },
     updateLetterText() {
-      const readyLetterNodes = Array.from(this.letter.childNodes).map(node => {
-        if (node.nodeType === 3) {
-          return node.textContent;
-        }
-        else if (node.dataset.token) {
-          return `[[[${node.textContent}]]]`;
-        } 
-        else {
-          return node.textContent;
-        }
-      });
-      this.readyLetter.text = readyLetterNodes.join('');
-      // this.readyLetter.tokens = []; //!!!!!!
+      
+      // let newLetterText = this.readyLetter.text;
+      //   newLetterText = newLetterText.replace( /\[\[\[/g, '<span data-token="true" class="editor__added-token" contenteditable="false">' );
+      //   newLetterText = newLetterText.replace( /\]\]\]/g, '</span>' );
+      // this.letter.innerHTML = newLetterText;
     },
     saveToLocalstorage() {
-      localStorage.setItem("letter", JSON.stringify(this.readyLetter));
+      localStorage.setItem("letter", JSON.stringify(this.dataForLetter));
     },
     loadFromLocalstorage() {
-      this.readyLetter = JSON.parse(localStorage.getItem("letter"));
-
+      this.dataForLetter = JSON.parse(localStorage.getItem("letter"));
+      this.updateLetterText();
     },
   },
   watch: {
@@ -269,6 +279,16 @@ export default {
     padding: 10px;
     box-sizing: border-box;
     background-color:white;
+  }
+  &__letter-fragment {
+    display: inline-flex;
+    align-items: baseline;
+  }
+  &__text-p {
+    display: inline-block;
+    padding: 0;
+    margin: 0;
+    white-space: pre;
   }
   &__tokens {
     display: flex;
